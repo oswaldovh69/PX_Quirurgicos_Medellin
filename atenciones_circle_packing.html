@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Main Styling -->
+  <link href="css/main.css" rel="stylesheet">
+
+  <!-- Bootstrap -->
+  <link href="css/bootstrap.css" rel="stylesheet">
+
+  <!-- Font Awesome Icons -->
+  <link href="css/font-awesome.min.css" rel="stylesheet">
+
+  <!-- Open Sans Font -->
+  <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,500,600,700,900' rel='stylesheet' type='text/css'>
+
+</head>
+<svg width="960" height="960"><g transform="translate(1,1)"></g></svg>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script charset="utf-8">
+
+var svg = d3.select("svg"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height");
+
+var format = d3.format(",d");
+
+/*
+scaleSequential Option Values
+interpolateRainbow
+interpolateViridis
+interpolateCool
+interpolateCubehelixDefault
+interpolateMagma
+*/
+
+var color = d3.scaleSequential(d3.interpolateRainbow)
+    .domain([-4, 4]);
+
+var stratify = d3.stratify()
+    .parentId(function(d) { return d.id.substring(0, d.id.lastIndexOf(".")); });
+
+var pack = d3.pack()
+    .size([width - 2, height - 2])
+    .padding(3);
+	
+d3.csv("data/quirurgico.csv", function(error, data) {
+//d3.csv("quirurgico.csv", function(error, data) {
+//d3.csv("flare_07.csv", function(error, data) {
+  if (error) throw error;
+
+  var root = stratify(data)
+      .sum(function(d) { return d.value; })
+      .sort(function(a, b) { return b.value - a.value; });
+
+  pack(root);
+
+  var node = svg.select("g")
+    .selectAll("g")
+    .data(root.descendants())
+    .enter().append("g")
+      .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
+      .attr("class", function(d) { return "node" + (!d.children ? " node--leaf" : d.depth ? "" : " node--root"); })
+      .each(function(d) { d.node = this; })
+      .on("mouseover", hovered(true))
+      .on("mouseout", hovered(false));
+
+  node.append("circle")
+      .attr("id", function(d) { return "node-" + d.id; })
+      .attr("r", function(d) { return d.r; })
+      .style("fill", function(d) { return color(d.depth); });
+
+  var leaf = node.filter(function(d) { return !d.children; });
+
+  leaf.append("clipPath")
+      .attr("id", function(d) { return "clip-" + d.id; })
+    .append("use")
+      .attr("xlink:href", function(d) { return "#node-" + d.id + ""; });
+
+  leaf.append("text")
+      .attr("clip-path", function(d) { return "url(#clip-" + d.id + ")"; })
+    .selectAll("tspan")
+    .data(function(d) { return d.id.substring(d.id.lastIndexOf(".") + 1).split(/(?=[A-Z][^A-Z])/g); })
+    .enter().append("tspan")
+      .attr("x", 0)
+      .attr("y", function(d, i, nodes) { return 13 + (i - nodes.length / 2 - 0.5) * 10; })
+      .text(function(d) { return d; });
+
+  node.append("title")
+      .text(function(d) { return d.id + "\n" + format(d.value); });
+});
+
+function hovered(hover) {
+  return function(d) {
+    d3.selectAll(d.ancestors().map(function(d) { return d.node; })).classed("node--hover", hover);
+  };
+}
+</script>
+<body>
+<br>
+<img src="images/quirurgico.png">
+<br>
+<a href="index.html">Atención en Procedimientos Quirurgicos - Municipio de Medellín 2016</a>
+</body>
